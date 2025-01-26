@@ -1,0 +1,223 @@
+import requests
+import threading
+import json
+import os
+import ssl
+import socket
+from datetime import datetime
+from fpdf import FPDF
+from colorama import Fore, Style, init
+
+init(autoreset=True)
+
+# Directory to save found files
+os.makedirs("found_files", exist_ok=True)
+
+def print_ascii_art():
+    print(Fore.RED + Style.BRIGHT + r"""
+                         /$$                           /$$           /$$   /$$    
+                        | $$                          | $$          |__/  | $$    
+ /$$  /$$  /$$  /$$$$$$ | $$$$$$$  /$$   /$$  /$$$$$$ | $$  /$$$$$$  /$$ /$$$$$$  
+| $$ | $$ | $$ /$$__  $$| $$__  $$|  $$ /$$/ /$$__  $$| $$ /$$__  $$| $$|_  $$_/  
+| $$ | $$ | $$| $$$$$$$$| $$  \ $$ \  $$$$/ | $$  \ $$| $$| $$  \ $$| $$  | $$    
+| $$ | $$ | $$| $$_____/| $$  | $$  >$$  $$ | $$  | $$| $$| $$  | $$| $$  | $$ /$$
+|  $$$$$/$$$$/|  $$$$$$$| $$$$$$$/ /$$/\  $$| $$$$$$$/| $$|  $$$$$$/| $$  |  $$$$/
+ \_____\___/  \_______/|_______/ |__/  \__/| $$____/ |__/ \______/ |__/   \___/  
+                                            | $$                                  
+                                            | $$                                  
+                                            |__/                                  
+
+                                   Created by Mal
+    """)
+
+def main_menu():
+    print_ascii_art()
+    print(Fore.CYAN + """
+    ================================
+    Web Vulnerability Testing Tool
+    ================================
+    1. Test for Missing Security Headers
+    2. Test for CORS Misconfiguration
+    3. Test for Open Redirects
+    4. Test for Insecure Cookies
+    5. Attempt Website Defacement
+    6. Check for Files on Website
+    7. Enumerate Subdomains
+    8. Test API Security
+    9. Test SSL/TLS Configuration
+    10. Generate a Vulnerability Report
+    11. Exit
+    """ + Style.RESET_ALL)
+    choice = input(Fore.GREEN + "Select an option: " + Style.RESET_ALL)
+    return choice
+
+def explain_option(option):
+    explanations = {
+        "1": "This test checks if critical HTTP security headers like X-Content-Type-Options, Content-Security-Policy, and X-Frame-Options are missing.",
+        "2": "This test checks if the website's CORS policy is misconfigured, allowing unauthorized origins to access sensitive resources.",
+        "3": "This test checks if the website is vulnerable to open redirects, which can redirect users to malicious sites.",
+        "4": "This test checks if cookies are set with Secure and HttpOnly attributes to prevent theft and unauthorized access.",
+        "5": "This attempts to deface the website by sending a payload to an editable endpoint.",
+        "6": "This checks for common files like robots.txt, sitemap.xml, and .env that might expose sensitive information.",
+        "7": "This enumerates subdomains of the target domain to expand the attack surface.",
+        "8": "This tests the security of API endpoints for vulnerabilities like missing authentication or input validation.",
+        "9": "This tests the SSL/TLS configuration for validity, expiration, and strength.",
+        "10": "This generates a detailed PDF report of all vulnerabilities found during the tests."
+    }
+    print(Fore.YELLOW + explanations.get(option, "No explanation available.") + Style.RESET_ALL)
+
+def exploit_missing_security_headers(url):
+    response = requests.get(url)
+    missing_headers = []
+
+    if 'X-Content-Type-Options' not in response.headers:
+        missing_headers.append('X-Content-Type-Options')
+
+    if 'Content-Security-Policy' not in response.headers:
+        missing_headers.append('Content-Security-Policy')
+
+    if 'X-Frame-Options' not in response.headers:
+        missing_headers.append('X-Frame-Options')
+
+    if missing_headers:
+        print(Fore.YELLOW + f"[!] Missing security headers: {', '.join(missing_headers)}")
+        print(Fore.CYAN + "Recommendation: Add these headers to your server configuration to protect against common web attacks like XSS and clickjacking." + Style.RESET_ALL)
+    else:
+        print(Fore.GREEN + "[+] All necessary security headers are present.")
+
+    return {"missing_headers": missing_headers}
+
+def test_cors_misconfiguration(url):
+    headers = {'Origin': 'http://malicious-site.com'}
+    try:
+        response = requests.get(url, headers=headers)
+        if 'Access-Control-Allow-Origin' in response.headers and response.headers['Access-Control-Allow-Origin'] == '*':
+            print(Fore.RED + "[!] CORS misconfiguration found!")
+            return {"cors_misconfiguration": True}
+        else:
+            print(Fore.GREEN + "[+] CORS configuration is secure.")
+            return {"cors_misconfiguration": False}
+    except Exception as e:
+        print(Fore.RED + f"[!] CORS Test Failed: {e}")
+        return {"cors_misconfiguration": "error"}
+
+def test_open_redirects(url):
+    redirect_url = f"{url}/redirect?url=http://malicious-site.com"
+    try:
+        response = requests.get(redirect_url, allow_redirects=False)
+        if response.status_code in [301, 302] and 'Location' in response.headers and 'http://malicious-site.com' in response.headers['Location']:
+            print(Fore.RED + "[!] Open redirect vulnerability found!")
+            return {"open_redirect": True}
+        else:
+            print(Fore.GREEN + "[+] No open redirect vulnerability detected.")
+            return {"open_redirect": False}
+    except Exception as e:
+        print(Fore.RED + f"[!] Open Redirect Test Failed: {e}")
+        return {"open_redirect": "error"}
+
+def test_insecure_cookies(url):
+    try:
+        response = requests.get(url)
+        cookies = response.headers.get('Set-Cookie', '')
+        insecure_cookies = [cookie for cookie in cookies.split(',') if 'Secure' not in cookie or 'HttpOnly' not in cookie]
+        if insecure_cookies:
+            print(Fore.RED + f"[!] Insecure cookies found: {insecure_cookies}")
+            return {"insecure_cookies": insecure_cookies}
+        else:
+            print(Fore.GREEN + "[+] All cookies are secure.")
+            return {"insecure_cookies": False}
+    except Exception as e:
+        print(Fore.RED + f"[!] Cookie Test Failed: {e}")
+        return {"insecure_cookies": "error"}
+
+def deface_website(url):
+    payload = "<h1 style='color:red;text-align:center;'>Website Defaced!</h1>"
+    deface_endpoint = f"{url}/deface"
+    try:
+        response = requests.post(deface_endpoint, data={"content": payload})
+        if response.status_code == 200:
+            print(Fore.RED + "[!] Website defaced successfully!")
+            return {"defacement": True}
+        else:
+            print(Fore.YELLOW + f"[!] Defacement failed with status code {response.status_code}")
+            return {"defacement": False}
+    except Exception as e:
+        print(Fore.RED + f"[!] Defacement attempt failed: {e}")
+        return {"defacement": "error"}
+
+def check_files_on_website(url):
+    print(Fore.CYAN + "[+] Checking for common files on the website...")
+    common_files = ["robots.txt", "sitemap.xml", "admin", "login", "config.php", ".env"]
+    found_files = []
+
+    for file in common_files:
+        file_url = f"{url}/{file}"
+        try:
+            response = requests.get(file_url)
+            if response.status_code == 200:
+                print(Fore.GREEN + f"[+] Found: {file_url}")
+                found_files.append(file_url)
+            else:
+                print(Fore.YELLOW + f"[-] Not found: {file_url}")
+        except Exception as e:
+            print(Fore.RED + f"[!] Error checking {file_url}: {e}")
+
+    return {"found_files": found_files}
+
+def generate_report(results):
+    print(Fore.CYAN + "[+] Generating report...")
+    try:
+        report_path = "vulnerability_report.pdf"
+        pdf = FPDF()
+        pdf.set_auto_page_break(auto=True, margin=15)
+        pdf.add_page()
+        pdf.set_font("Arial", size=12)
+
+        pdf.cell(200, 10, txt="Vulnerability Report", ln=True, align="C")
+        pdf.ln(10)
+
+        pdf.multi_cell(0, 10, txt=json.dumps(results, indent=4))
+
+        pdf.output(report_path)
+        print(Fore.GREEN + f"[+] Report generated: {report_path}")
+    except Exception as e:
+        print(Fore.RED + f"[!] Report Generation Failed: {e}")
+
+if __name__ == "__main__":
+    results = {}
+    while True:
+        choice = main_menu()
+        explain_option(choice)
+        if choice == "1":
+            target_url = input(Fore.GREEN + "Enter the target URL: " + Style.RESET_ALL)
+            results.update(exploit_missing_security_headers(target_url))
+        elif choice == "2":
+            target_url = input(Fore.GREEN + "Enter the target URL: " + Style.RESET_ALL)
+            results.update(test_cors_misconfiguration(target_url))
+        elif choice == "3":
+            target_url = input(Fore.GREEN + "Enter the target URL: " + Style.RESET_ALL)
+            results.update(test_open_redirects(target_url))
+        elif choice == "4":
+            target_url = input(Fore.GREEN + "Enter the target URL: " + Style.RESET_ALL)
+            results.update(test_insecure_cookies(target_url))
+        elif choice == "5":
+            target_url = input(Fore.GREEN + "Enter the target URL: " + Style.RESET_ALL)
+            results.update(deface_website(target_url))
+        elif choice == "6":
+            target_url = input(Fore.GREEN + "Enter the target URL: " + Style.RESET_ALL)
+            results.update(check_files_on_website(target_url))
+        elif choice == "7":
+            target_domain = input(Fore.GREEN + "Enter the target domain (e.g., example.com): " + Style.RESET_ALL)
+            results.update(enumerate_subdomains(target_domain))
+        elif choice == "8":
+            api_url = input(Fore.GREEN + "Enter the API endpoint URL: " + Style.RESET_ALL)
+            results.update(test_api_security(api_url))
+        elif choice == "9":
+            print(Fore.YELLOW + "SSL/TLS testing feature is coming soon!" + Style.RESET_ALL)
+        elif choice == "10":
+            generate_report(results)
+        elif choice == "11":
+            print(Fore.CYAN + "Exiting..." + Style.RESET_ALL)
+            break
+        else:
+            print(Fore.RED + "Invalid choice. Please try again." + Style.RESET_ALL)
