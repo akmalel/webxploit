@@ -1,6 +1,6 @@
 # webxploit
 
 ---
-<img width="988" alt="Screen Shot 2025-01-25 at 11 36 15 PM" src="https://github.com/user-attachments/assets/47ff6d85-c993-49b2-8629-1a311090f1f0" />
+<img width="769" alt="Screen Shot 2025-01-26 at 1 06 32 PM" src="https://github.com/user-attachments/assets/99c32ad5-b1b6-43a9-861c-f1e9efa68ffb" />
 
 ---
