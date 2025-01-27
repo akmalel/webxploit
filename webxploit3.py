@@ -38,7 +38,7 @@ def print_ascii_art():
 def main_menu():
     print(Fore.CYAN + """
     ================================
-    Advanced CTF Exploitation Tool
+    Advanced Web Vulnerability Tool
     ================================
     1. Scanning and Recon
     2. Testing
@@ -844,7 +844,7 @@ if __name__ == "__main__":
     while True:
         print(Fore.CYAN + """
         ================================
-        Advanced CTF Exploitation Tool
+        Advanced Web Vulnerability Tool
         ================================
         1. Scanning and Recon
         2. Web Application Testing
